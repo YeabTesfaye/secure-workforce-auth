@@ -1,0 +1,245 @@
+openapi: 3.0.3
+info:
+  title: SecureWorkforce Auth Platform
+  version: "1.0.0"
+  description: >
+    Multi-tenant authentication and authorization service for a workforce
+    management SaaS platform. See /docs (this file) and docs/*.md in the
+    repository for the full architecture, security, and threat-model writeups.
+servers:
+  - url: http://localhost:4000
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: access_token
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+        requestId: { type: string }
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        "200": { description: OK }
+
+  /auth/register:
+    post:
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, minLength: 12 }
+                fullName: { type: string }
+      responses:
+        "201": { description: Registered }
+        "400": { description: Validation error }
+        "409": { description: Email already registered }
+
+  /auth/login:
+    post:
+      summary: Log in and start a session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        "200": { description: Logged in, cookies set }
+        "401": { description: Invalid credentials }
+        "423": { description: Account locked }
+
+  /auth/logout:
+    post:
+      summary: Log out and revoke the current session
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      responses:
+        "200": { description: Logged out }
+        "403": { description: CSRF validation failed }
+
+  /auth/refresh:
+    post:
+      summary: Rotate the refresh token and issue a new access token
+      responses:
+        "200": { description: Rotated }
+        "401": { description: Invalid, expired, or reused refresh token }
+
+  /auth/forgot-password:
+    post:
+      summary: Request a password reset email (always returns generically)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        "200": { description: Generic acknowledgement }
+
+  /auth/reset-password:
+    post:
+      summary: Reset password using a token from the reset email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, newPassword]
+              properties:
+                token: { type: string }
+                newPassword: { type: string, minLength: 12 }
+      responses:
+        "200": { description: Password reset }
+        "400": { description: Invalid or expired token }
+
+  /users/me:
+    get:
+      summary: Get the authenticated user's profile
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      responses:
+        "200": { description: OK }
+        "401": { description: Unauthorized }
+    patch:
+      summary: Update the authenticated user's profile
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      responses:
+        "200": { description: Updated }
+
+  /sessions:
+    get:
+      summary: List the caller's active sessions
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      responses:
+        "200": { description: OK }
+
+  /organizations:
+    get:
+      summary: List organizations the caller belongs to
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      responses:
+        "200": { description: OK }
+    post:
+      summary: Create a new organization (caller becomes OWNER)
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+      responses:
+        "201": { description: Created }
+
+  /organizations/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      summary: Get an organization (requires membership + organization:read)
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      responses:
+        "200": { description: OK }
+        "403": { description: Not a member of this organization }
+    patch:
+      summary: Update an organization (requires organization:update)
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      responses:
+        "200": { description: Updated }
+    delete:
+      summary: Delete an organization (requires organization:delete)
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      responses:
+        "204": { description: Deleted }
+
+  /organizations/{id}/members:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      summary: List organization members (requires members:read)
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      responses:
+        "200": { description: OK }
+    post:
+      summary: Add a member (requires members:create)
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      responses:
+        "201": { description: Added }
+
+  /organizations/{id}/projects/{projectId}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: projectId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      summary: >
+        Update a project. Requires projects:update (RBAC) AND being the
+        project's assigned manager or org OWNER (resource-level check).
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      responses:
+        "200": { description: Updated }
+        "403": { description: Role allows updates in general, but not to this specific project }
+
+  /organizations/{id}/audit-logs:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      summary: Query security audit logs (requires audit_logs:read)
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - name: event
+          in: query
+          schema: { type: string }
+        - name: userId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: startDate
+          in: query
+          schema: { type: string, format: date-time }
+        - name: endDate
+          in: query
+          schema: { type: string, format: date-time }
+      responses:
+        "200": { description: OK }
