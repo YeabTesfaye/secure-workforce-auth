@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -30,19 +28,31 @@ services:
   api:
     build:
       context: .
-      dockerfile: docker/Dockerfile
+      dockerfile: docker/Dockerfile.dev
     ports:
       - "4000:4000"
     env_file:
       - .env
     environment:
+      # Your .env has DATABASE_URL/REDIS_URL pointing at "localhost", which
+      # is correct when running the app directly on your machine but wrong
+      # inside a container talking to sibling containers. These two
+      # override the .env values (Compose applies `environment:` after
+      # `env_file:`) so you don't have to edit .env at all -- everything
+      # else in .env (secrets, TTLs, rate limits, etc.) is used as-is.
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/secure_workforce
       REDIS_URL: redis://redis:6379
+    volumes:
+      # Mount source for hot reload; keep node_modules from the image
+      # rather than the host, in case host/container platforms differ.
+      - .:/app
+      - /app/node_modules
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+    command: sh -c "npm run db:migrate && npm run dev"
 
 volumes:
   postgres_data:

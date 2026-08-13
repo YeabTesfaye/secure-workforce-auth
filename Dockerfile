@@ -1,0 +1,16 @@
+# Development image: installs all deps (including devDependencies) and runs
+# the TypeScript source directly via tsx watch, so code changes on the
+# mounted volume reload without a rebuild. Use docker/Dockerfile (the
+# multi-stage production build) for anything deployed.
+
+FROM node:24-alpine
+WORKDIR /app
+
+COPY package.json package-lock.json* ./
+RUN npm install
+
+COPY . .
+
+EXPOSE 4000
+
+CMD ["npm", "run", "dev"]

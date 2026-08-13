@@ -17,10 +17,9 @@
     "noUnusedParameters": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"],
-      "@db/*": ["db/*"]
+      "@/*": ["./src/*"],
+      "@db/*": ["./db/*"]
     }
   },
   "include": ["src/**/*.ts", "db/**/*.ts", "tests/**/*.ts"],
