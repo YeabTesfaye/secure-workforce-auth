@@ -6,6 +6,11 @@ info:
     Multi-tenant authentication and authorization service for a workforce
     management SaaS platform. See /docs (this file) and docs/*.md in the
     repository for the full architecture, security, and threat-model writeups.
+
+    Cookie-authenticated clients must send the csrf_token cookie's value in
+    an X-CSRF-Token header on every mutating request. In Swagger UI: log in
+    via POST /auth/login, copy the csrf_token cookie value from your
+    browser, then click Authorize (top right) and paste it under csrfAuth.
 servers:
   - url: http://localhost:4000
 components:
@@ -18,6 +23,14 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
+    csrfAuth:
+      type: apiKey
+      in: header
+      name: X-CSRF-Token
+      description: >
+        Required on every state-changing (POST/PATCH/PUT/DELETE) request
+        made with cookie auth. Value must match the non-HttpOnly csrf_token
+        cookie set at login/refresh.
   schemas:
     Error:
       type: object
@@ -28,12 +41,43 @@ components:
             code: { type: string }
             message: { type: string }
         requestId: { type: string }
+  parameters:
+    OrgId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    RoleId:
+      name: roleId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    ProjectId:
+      name: projectId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    SessionId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
 paths:
   /health:
     get:
       summary: Health check
       responses:
         "200": { description: OK }
+
+  # ---------------------------------------------------------------------
+  # Auth
+  # ---------------------------------------------------------------------
 
   /auth/register:
     post:
@@ -47,16 +91,36 @@ paths:
               required: [email, password]
               properties:
                 email: { type: string, format: email }
-                password: { type: string, minLength: 12 }
+                password:
+                  type: string
+                  minLength: 12
+                  description: 12+ chars, must include lowercase, uppercase, digit, symbol.
                 fullName: { type: string }
       responses:
         "201": { description: Registered }
-        "400": { description: Validation error }
+        "400": { description: Validation error (weak/common password, invalid email) }
         "409": { description: Email already registered }
+
+  /auth/verify-email:
+    post:
+      summary: Verify an email address using the token from the verification email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string }
+      responses:
+        "200": { description: Verified }
+        "400": { description: Invalid or expired token }
 
   /auth/login:
     post:
       summary: Log in and start a session
+      description: Sets access_token, refresh_token, and csrf_token cookies on success.
       requestBody:
         required: true
         content:
@@ -68,28 +132,33 @@ paths:
                 email: { type: string, format: email }
                 password: { type: string }
       responses:
-        "200": { description: Logged in, cookies set }
-        "401": { description: Invalid credentials }
-        "423": { description: Account locked }
+        "200": { description: Logged in, cookies set, accessToken and csrfToken also returned in body }
+        "401": { description: Invalid credentials (generic message for any failure reason) }
+        "423": { description: Account locked after repeated failed attempts }
 
   /auth/logout:
     post:
       summary: Log out and revoke the current session
-      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      security: [{ cookieAuth: [], csrfAuth: [] }, { bearerAuth: [] }]
       responses:
         "200": { description: Logged out }
-        "403": { description: CSRF validation failed }
+        "403": { description: CSRF validation failed (cookie clients only) }
 
   /auth/refresh:
     post:
       summary: Rotate the refresh token and issue a new access token
+      description: >
+        Reads the refresh_token cookie (path-scoped to this endpoint). Not
+        CSRF-protected -- see docs/security.md for why. Reusing an
+        already-rotated token revokes the entire session.
       responses:
-        "200": { description: Rotated }
+        "200": { description: Rotated -- new access_token, refresh_token, csrf_token cookies set }
         "401": { description: Invalid, expired, or reused refresh token }
 
   /auth/forgot-password:
     post:
-      summary: Request a password reset email (always returns generically)
+      summary: Request a password reset email
+      description: Always returns 200 with a generic message, whether or not the account exists.
       requestBody:
         required: true
         content:
@@ -105,6 +174,7 @@ paths:
   /auth/reset-password:
     post:
       summary: Reset password using a token from the reset email
+      description: Revokes all of the account's sessions on success.
       requestBody:
         required: true
         content:
@@ -117,7 +187,30 @@ paths:
                 newPassword: { type: string, minLength: 12 }
       responses:
         "200": { description: Password reset }
-        "400": { description: Invalid or expired token }
+        "400": { description: Invalid/expired token, or password too weak/common }
+
+  /auth/change-password:
+    post:
+      summary: Change password while authenticated
+      description: Revokes every OTHER session; the current session stays active.
+      security: [{ cookieAuth: [], csrfAuth: [] }, { bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword: { type: string }
+                newPassword: { type: string, minLength: 12 }
+      responses:
+        "200": { description: Changed }
+        "400": { description: Current password incorrect, or new password too weak/common }
+
+  # ---------------------------------------------------------------------
+  # Users
+  # ---------------------------------------------------------------------
 
   /users/me:
     get:
@@ -128,9 +221,20 @@ paths:
         "401": { description: Unauthorized }
     patch:
       summary: Update the authenticated user's profile
-      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      security: [{ cookieAuth: [], csrfAuth: [] }, { bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fullName: { type: string }
       responses:
         "200": { description: Updated }
+
+  # ---------------------------------------------------------------------
+  # Sessions
+  # ---------------------------------------------------------------------
 
   /sessions:
     get:
@@ -138,6 +242,27 @@ paths:
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       responses:
         "200": { description: OK }
+
+  /sessions/all:
+    delete:
+      summary: Revoke every session except the current one
+      security: [{ cookieAuth: [], csrfAuth: [] }, { bearerAuth: [] }]
+      responses:
+        "200": { description: Revoked }
+
+  /sessions/{id}:
+    parameters:
+      - $ref: "#/components/parameters/SessionId"
+    delete:
+      summary: Revoke one session (and its refresh token family)
+      security: [{ cookieAuth: [], csrfAuth: [] }, { bearerAuth: [] }]
+      responses:
+        "200": { description: Revoked }
+        "404": { description: Session not found }
+
+  # ---------------------------------------------------------------------
+  # Organizations
+  # ---------------------------------------------------------------------
 
   /organizations:
     get:
@@ -147,7 +272,7 @@ paths:
         "200": { description: OK }
     post:
       summary: Create a new organization (caller becomes OWNER)
-      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      security: [{ cookieAuth: [], csrfAuth: [] }, { bearerAuth: [] }]
       requestBody:
         required: true
         content:
@@ -162,10 +287,7 @@ paths:
 
   /organizations/{id}:
     parameters:
-      - name: id
-        in: path
-        required: true
-        schema: { type: string, format: uuid }
+      - $ref: "#/components/parameters/OrgId"
     get:
       summary: Get an organization (requires membership + organization:read)
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
@@ -174,72 +296,244 @@ paths:
         "403": { description: Not a member of this organization }
     patch:
       summary: Update an organization (requires organization:update)
-      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      security: [{ cookieAuth: [], csrfAuth: [] }, { bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
       responses:
         "200": { description: Updated }
     delete:
       summary: Delete an organization (requires organization:delete)
-      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      security: [{ cookieAuth: [], csrfAuth: [] }, { bearerAuth: [] }]
       responses:
         "204": { description: Deleted }
 
+  # ---------------------------------------------------------------------
+  # Members
+  # ---------------------------------------------------------------------
+
   /organizations/{id}/members:
     parameters:
-      - name: id
-        in: path
-        required: true
-        schema: { type: string, format: uuid }
+      - $ref: "#/components/parameters/OrgId"
     get:
       summary: List organization members (requires members:read)
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       responses:
         "200": { description: OK }
     post:
-      summary: Add a member (requires members:create)
-      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      summary: Add an existing user as a member (requires members:create)
+      security: [{ cookieAuth: [], csrfAuth: [] }, { bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, roleId]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: Must belong to an already-registered user.
+                roleId:
+                  type: string
+                  format: uuid
+                  description: Must be a role belonging to this organization -- see GET /organizations/{id}/roles.
       responses:
         "201": { description: Added }
+        "404": { description: No user found with that email }
+        "409": { description: User is already a member of this organization }
+
+  /organizations/{id}/members/{userId}:
+    parameters:
+      - $ref: "#/components/parameters/OrgId"
+      - $ref: "#/components/parameters/UserId"
+    patch:
+      summary: Change a member's role (requires members:update)
+      description: Revokes the target member's sessions so the new role takes effect immediately.
+      security: [{ cookieAuth: [], csrfAuth: [] }, { bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [roleId]
+              properties:
+                roleId: { type: string, format: uuid }
+      responses:
+        "200": { description: Updated }
+        "404": { description: Membership not found }
+    delete:
+      summary: Remove a member (requires members:delete)
+      security: [{ cookieAuth: [], csrfAuth: [] }, { bearerAuth: [] }]
+      responses:
+        "204": { description: Removed }
+        "404": { description: Membership not found }
+
+  # ---------------------------------------------------------------------
+  # Roles
+  # ---------------------------------------------------------------------
+
+  /organizations/{id}/roles:
+    parameters:
+      - $ref: "#/components/parameters/OrgId"
+    get:
+      summary: List roles in this organization (requires roles:read)
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      responses:
+        "200": { description: OK }
+    post:
+      summary: Create a custom role (requires roles:manage)
+      security: [{ cookieAuth: [], csrfAuth: [] }, { bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                permissionKeys:
+                  type: array
+                  items: { type: string }
+                  description: Keys from GET /organizations/{id}/permissions, e.g. "projects:update".
+                  default: []
+      responses:
+        "201": { description: Created }
+        "400": { description: One or more permission keys are invalid }
+
+  /organizations/{id}/roles/{roleId}:
+    parameters:
+      - $ref: "#/components/parameters/OrgId"
+      - $ref: "#/components/parameters/RoleId"
+    patch:
+      summary: Replace a role's permission set (requires roles:manage)
+      description: System roles (OWNER, MANAGER, EMPLOYEE, HR_ADMINISTRATOR) cannot be modified.
+      security: [{ cookieAuth: [], csrfAuth: [] }, { bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [permissionKeys]
+              properties:
+                permissionKeys:
+                  type: array
+                  items: { type: string }
+      responses:
+        "200": { description: Updated }
+        "403": { description: System roles cannot be modified }
+        "404": { description: Role not found }
+    delete:
+      summary: Delete a custom role (requires roles:manage)
+      description: System roles, and roles still assigned to a member, cannot be deleted.
+      security: [{ cookieAuth: [], csrfAuth: [] }, { bearerAuth: [] }]
+      responses:
+        "204": { description: Deleted }
+        "400": { description: Role is still assigned to one or more members }
+        "403": { description: System roles cannot be deleted }
+        "404": { description: Role not found }
+
+  # ---------------------------------------------------------------------
+  # Permissions
+  # ---------------------------------------------------------------------
+
+  /organizations/{id}/permissions:
+    parameters:
+      - $ref: "#/components/parameters/OrgId"
+    get:
+      summary: List the global permission catalog (requires roles:read)
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      responses:
+        "200": { description: OK }
+
+  # ---------------------------------------------------------------------
+  # Projects
+  # ---------------------------------------------------------------------
+
+  /organizations/{id}/projects:
+    parameters:
+      - $ref: "#/components/parameters/OrgId"
+    get:
+      summary: List projects in this organization (requires projects:read)
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      responses:
+        "200": { description: OK }
+    post:
+      summary: Create a project (requires projects:create)
+      security: [{ cookieAuth: [], csrfAuth: [] }, { bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                managerId: { type: string, format: uuid }
+      responses:
+        "201": { description: Created }
 
   /organizations/{id}/projects/{projectId}:
     parameters:
-      - name: id
-        in: path
-        required: true
-        schema: { type: string, format: uuid }
-      - name: projectId
-        in: path
-        required: true
-        schema: { type: string, format: uuid }
+      - $ref: "#/components/parameters/OrgId"
+      - $ref: "#/components/parameters/ProjectId"
     patch:
-      summary: >
-        Update a project. Requires projects:update (RBAC) AND being the
-        project's assigned manager or org OWNER (resource-level check).
-      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      summary: Update a project
+      description: >
+        Requires projects:update (RBAC) AND being the project's assigned
+        manager or org OWNER (resource-level check) -- having the role
+        permission alone is not sufficient.
+      security: [{ cookieAuth: [], csrfAuth: [] }, { bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                managerId: { type: string, format: uuid }
       responses:
         "200": { description: Updated }
         "403": { description: Role allows updates in general, but not to this specific project }
+        "404": { description: Project not found }
+
+  # ---------------------------------------------------------------------
+  # Audit logs
+  # ---------------------------------------------------------------------
 
   /organizations/{id}/audit-logs:
     parameters:
-      - name: id
-        in: path
-        required: true
-        schema: { type: string, format: uuid }
+      - $ref: "#/components/parameters/OrgId"
     get:
       summary: Query security audit logs (requires audit_logs:read)
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
-        - name: event
-          in: query
-          schema: { type: string }
         - name: userId
           in: query
           schema: { type: string, format: uuid }
+        - name: event
+          in: query
+          schema: { type: string }
         - name: startDate
           in: query
           schema: { type: string, format: date-time }
         - name: endDate
           in: query
           schema: { type: string, format: date-time }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+        - name: offset
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
       responses:
         "200": { description: OK }

@@ -51,7 +51,11 @@ projectsRouter.patch(
   requireProjectAccess,
   asyncHandler(async (req, res) => {
     const input = updateProjectSchema.parse(req.body);
-    const project = await service.updateProject((req.params.projectId as string), input);
+    const project = await service.updateProject(
+      req.orgContext!.organizationId,
+      req.params.projectId as string,
+      input
+    );
     res.json({ data: project });
   })
 );
