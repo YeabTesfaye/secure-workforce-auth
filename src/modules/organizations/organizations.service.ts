@@ -81,10 +81,12 @@ export async function listOrganizationsForUser(userId: string) {
       id: organizations.id,
       name: organizations.name,
       slug: organizations.slug,
-      roleName: organizationMembers.roleId,
+      roleId: roles.id,
+      roleName: roles.name,
     })
     .from(organizationMembers)
     .innerJoin(organizations, eq(organizationMembers.organizationId, organizations.id))
+    .innerJoin(roles, eq(organizationMembers.roleId, roles.id))
     .where(eq(organizationMembers.userId, userId));
 }
 

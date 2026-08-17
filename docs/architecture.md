@@ -1,5 +1,33 @@
 # Architecture
 
+## System overview
+
+```text
+                    ┌─────────────────────┐
+                    │   Next.js Demo       │
+                    │  (secure-workforce-  │
+                    │       demo/)         │
+                    └──────────┬──────────┘
+                               │ HTTP/HTTPS
+                               ▼
+                    ┌─────────────────────┐
+                    │    Express API       │
+                    ├─────────────────────┤
+                    │ Validation (Zod)     │
+                    │ Authentication       │
+                    │ Authorization        │
+                    │ Rate Limiting        │
+                    │ Audit Logging        │
+                    └──────┬─────────┬────┘
+                           │         │
+                    ┌──────▼───┐ ┌──▼──────┐
+                    │PostgreSQL│ │  Redis  │
+                    │ (Drizzle)│ │         │
+                    └──────────┘ └─────────┘
+```
+
+The Next.js demo client is optional and entirely separate from the backend's authority: it calls the public HTTP API exactly like any other consumer would, holds no authentication or authorization logic of its own, and every permission decision it reflects in the UI is only ever a reflection of what the API already allowed or rejected -- see `secure-workforce-demo/README.md`.
+
 ## Module layout
 
 ```
@@ -19,6 +47,26 @@ src/
 ```
 
 Each module keeps controllers thin: parse input with Zod, call the service, shape the response. All business logic and DB access lives in `*.service.ts`. This is a deliberate choice over a repository-abstraction layer -- Drizzle queries are already a thin, typed abstraction over SQL, and adding another layer on top would hide rather than clarify what each operation actually does to the database.
+
+## Authorization pipeline
+
+```text
+Request
+   ↓
+Authentication        -- verify JWT, check tokenVersion + session validity
+   ↓
+Tenant Resolution      -- resolve :organizationId, confirm real membership
+   ↓
+Permission Check       -- does the caller's role grant this permission (RBAC)
+   ↓
+Resource-Level Authorization  -- is the caller authorized for THIS resource
+   ↓
+Controller
+   ↓
+Audit Event
+```
+
+This is implemented as four separate, composable middleware functions rather than one monolithic check, so each route only pays for the layers it actually needs (e.g. `GET /health` has none of them; `PATCH /organizations/:id/projects/:projectId` has all four):
 
 ## Request pipeline
 

@@ -28,6 +28,13 @@ describe("multi-tenant RBAC (integration)", () => {
     expect(createRes.status).toBe(201);
     const orgId = createRes.body.data.id;
 
+    // Regression test: GET /organizations must return the human-readable
+    // role name ("OWNER"), not the raw roleId UUID mistakenly aliased as
+    // roleName.
+    const listRes = await request(app).get("/organizations").set("Cookie", alice.header);
+    const created = listRes.body.data.find((o: { id: string }) => o.id === orgId);
+    expect(created.roleName).toBe("OWNER");
+
     const updateRes = await request(app)
       .patch(`/organizations/${orgId}`)
       .set("Cookie", alice.header)

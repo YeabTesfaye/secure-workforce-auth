@@ -4,12 +4,11 @@ export default defineConfig({
   test: {
     environment: "node",
     globals: true,
-    setupFiles: ["./tests/setup.ts"],
+    setupFiles: ["./tests/env.setup.ts", "./tests/setup.ts"],
     testTimeout: 15000,
     hookTimeout: 20000,
     pool: "forks",
-    poolOptions: {
-      forks: { singleFork: true }, // avoid parallel DB state collisions across test files
-    },
+    maxWorkers: 1,   // replaces poolOptions.forks.singleFork: true
+    isolate: false,  // replaces poolOptions.forks.singleFork behavior (no cross-file collision)
   },
 });
