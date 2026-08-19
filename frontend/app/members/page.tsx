@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { RequireAuth } from "@/components/RequireAuth";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
+import { SkeletonTable } from "@/components/Skeleton";
 import { useAuth } from "@/lib/auth-context";
 import { api, type Member } from "@/lib/api";
 
@@ -11,30 +12,42 @@ function MembersContent() {
   const [members, setMembers] = useState<Member[] | null>(null);
   const [error, setError] = useState<unknown>(null);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     if (!currentOrg) return;
 
-    // Use a flag to avoid setting state if the component unmounts mid-flight
     let isMounted = true;
 
     api<{ data: Member[] }>(`/organizations/${currentOrg.id}/members`)
       .then((res) => {
         if (isMounted) {
           setMembers(res.data);
-          setError(null); // Safely clear any previous errors here
+          setError(null);
         }
       })
       .catch((err) => {
         if (isMounted) {
           setError(err);
-          setMembers(null); // Clear the members list if the API fails
+          setMembers(null);
         }
       });
 
     return () => {
       isMounted = false;
     };
-  }, [currentOrg]);
+  }, [currentOrg?.id]);
+
+  useEffect(() => {
+    const cleanup = load();
+    return () => {
+      if (cleanup) cleanup();
+    };
+  }, [load]);
+
+  // Reset state when org changes
+  useEffect(() => {
+    setMembers(null);
+    setError(null);
+  }, [currentOrg?.id]);
 
   return (
     <div className="space-y-4">
@@ -48,30 +61,32 @@ function MembersContent() {
       {error ? (
         <ApiErrorBanner error={error} />
       ) : !members ? (
-        <p className="text-sm text-slate-500">Loading...</p>
+        <SkeletonTable rows={5} cols={4} />
       ) : (
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-slate-800 text-left text-xs uppercase tracking-wide text-slate-500">
-              <th className="py-2">Name</th>
-              <th className="py-2">Email</th>
-              <th className="py-2">Role</th>
-              <th className="py-2">Joined</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-800">
-            {members.map((m) => (
-              <tr key={m.membershipId} className="text-slate-300">
-                <td className="py-2">{m.fullName ?? "—"}</td>
-                <td className="py-2 text-slate-400">{m.email}</td>
-                <td className="py-2">
-                  <span className="rounded bg-slate-800 px-2 py-0.5 text-xs">{m.roleName}</span>
-                </td>
-                <td className="py-2 text-slate-500">{new Date(m.createdAt).toLocaleDateString()}</td>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-800 text-left text-xs uppercase tracking-wide text-slate-500">
+                <th className="py-2">Name</th>
+                <th className="py-2">Email</th>
+                <th className="py-2">Role</th>
+                <th className="py-2 hidden sm:table-cell">Joined</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-slate-800">
+              {members.map((m) => (
+                <tr key={m.membershipId} className="text-slate-300">
+                  <td className="py-2">{m.fullName ?? "—"}</td>
+                  <td className="py-2 text-slate-400 text-xs sm:text-sm">{m.email}</td>
+                  <td className="py-2">
+                    <span className="rounded bg-slate-800 px-2 py-0.5 text-xs">{m.roleName}</span>
+                  </td>
+                  <td className="py-2 text-slate-500 hidden sm:table-cell">{new Date(m.createdAt).toLocaleDateString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

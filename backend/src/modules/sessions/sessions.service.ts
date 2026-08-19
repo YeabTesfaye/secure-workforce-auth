@@ -1,6 +1,6 @@
 import { db } from "../../infrastructure/database/client.js";
 import { sessions, refreshTokens } from "../../../db/schema/index.js";
-import { and, eq } from "drizzle-orm";
+import { and, eq, count } from "drizzle-orm";
 import { env } from "../../config/env.js";
 import { NotFoundError } from "../../shared/errors/app-error.js";
 
@@ -54,11 +54,20 @@ export async function touchSession(sessionId: string) {
   await db.update(sessions).set({ lastActiveAt: new Date() }).where(eq(sessions.id, sessionId));
 }
 
-export async function listSessions(userId: string) {
-  return db
-    .select()
+export async function listSessions(userId: string, limit: number, offset: number) {
+  const [totalRow] = await db
+    .select({ total: count() })
     .from(sessions)
     .where(and(eq(sessions.userId, userId), eq(sessions.revoked, false)));
+
+  const data = await db
+    .select()
+    .from(sessions)
+    .where(and(eq(sessions.userId, userId), eq(sessions.revoked, false)))
+    .limit(limit)
+    .offset(offset);
+
+  return { data, total: totalRow?.total ?? 0 };
 }
 
 export async function revokeSession(userId: string, sessionId: string) {
@@ -83,7 +92,7 @@ export async function revokeSession(userId: string, sessionId: string) {
 }
 
 export async function revokeAllSessions(userId: string, exceptSessionId?: string) {
-  const userSessions = await listSessions(userId);
+  const { data: userSessions } = await listSessions(userId, 1000, 0); // Get all sessions for revocation
   for (const session of userSessions) {
     if (session.id === exceptSessionId) continue;
     await revokeSession(userId, session.id);

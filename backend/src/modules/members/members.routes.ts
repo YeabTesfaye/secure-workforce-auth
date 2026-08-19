@@ -6,6 +6,7 @@ import { requirePermission } from "../../middleware/authorization.js";
 import { csrfProtection } from "../../middleware/csrf.js";
 import { PERMISSIONS } from "../../shared/utils/permissions-catalog.js";
 import { asyncHandler } from "../../shared/utils/async-handler.js";
+import { paginationSchema, buildPaginationMeta } from "../../shared/utils/pagination.js";
 
 // Mounted at /organizations/:id/members. loadOrgContext already ran via the
 // parent router's "/:id" middleware, so req.orgContext is populated here.
@@ -24,8 +25,9 @@ membersRouter.get(
   "/",
   requirePermission(PERMISSIONS.MEMBERS_READ),
   asyncHandler(async (req, res) => {
-    const members = await service.listMembers(req.orgContext!.organizationId);
-    res.json({ data: members });
+    const { limit, offset } = paginationSchema.parse(req.query);
+    const { data, total } = await service.listMembers(req.orgContext!.organizationId, limit, offset);
+    res.json({ data, pagination: buildPaginationMeta(total, limit, offset) });
   })
 );
 

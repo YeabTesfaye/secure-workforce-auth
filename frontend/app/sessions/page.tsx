@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { RequireAuth } from "@/components/RequireAuth";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
+import { SkeletonList } from "@/components/Skeleton";
 import { api, type Session } from "@/lib/api";
 
 function SessionsContent() {
@@ -71,7 +72,7 @@ function SessionsContent() {
         <button
           onClick={() => void revokeAllOthers()}
           disabled={busyId === "all"}
-          className="rounded border border-red-800 px-3 py-1.5 text-sm text-red-300 hover:bg-red-950/40 disabled:opacity-50"
+          className="rounded border border-red-800 px-3 py-1.5 text-sm text-red-300 hover:bg-red-950/40 disabled:opacity-50 shrink-0"
         >
           Revoke all other sessions
         </button>
@@ -80,7 +81,7 @@ function SessionsContent() {
       {error ? (
         <ApiErrorBanner error={error} />
       ) : !sessions ? (
-        <p className="text-sm text-slate-500">Loading...</p>
+        <SkeletonList rows={3} />
       ) : (
         <ul className="space-y-2">
           {sessions.map((s) => (
@@ -88,7 +89,7 @@ function SessionsContent() {
               key={s.id}
               className="flex items-center justify-between rounded border border-slate-800 bg-slate-900/40 p-3"
             >
-              <div>
+              <div className="min-w-0">
                 <p className="text-sm text-slate-200">
                   {s.deviceLabel}
                   {s.isCurrent && (

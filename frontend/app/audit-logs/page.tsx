@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { RequireAuth } from "@/components/RequireAuth";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
+import { SkeletonTable } from "@/components/Skeleton";
 import { useAuth } from "@/lib/auth-context";
 import { api, type AuditLogEntry } from "@/lib/api";
 
@@ -12,34 +13,43 @@ function AuditLogsContent() {
   const [error, setError] = useState<unknown>(null);
   const [eventFilter, setEventFilter] = useState("");
 
+  const load = useCallback(() => {
+    if (!currentOrg) return;
+
+    let isMounted = true;
+    const query = eventFilter ? `?event=${encodeURIComponent(eventFilter)}` : "";
+
+    api<{ data: AuditLogEntry[] }>(`/organizations/${currentOrg.id}/audit-logs${query}`)
+      .then((res) => {
+        if (isMounted) {
+          setLogs(res.data);
+          setError(null);
+        }
+      })
+      .catch((err) => {
+        if (isMounted) {
+          setError(err);
+          setLogs(null);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [currentOrg?.id, eventFilter]);
+
   useEffect(() => {
-  if (!currentOrg) return;
+    const cleanup = load();
+    return () => {
+      if (cleanup) cleanup();
+    };
+  }, [load]);
 
-  // Create an active flag to prevent race conditions
-  let isMounted = true; 
-
-  const query = eventFilter ? `?event=${encodeURIComponent(eventFilter)}` : "";
-  
-  api<{ data: AuditLogEntry[] }>(`/organizations/${currentOrg.id}/audit-logs${query}`)
-    .then((res) => {
-      if (isMounted) {
-        // This safely sets the new logs and clears any old state
-        setLogs(res.data);
-        setError(null); 
-      }
-    })
-    .catch((err) => {
-      if (isMounted) {
-        setError(err);
-        setLogs(null);
-      }
-    });
-
-  // Cleanup function runs if currentOrg or eventFilter changes mid-flight
-  return () => {
-    isMounted = false;
-  };
-}, [currentOrg, eventFilter]); // Make sure your dependencies are listed here
+  // Reset state when org changes
+  useEffect(() => {
+    setLogs(null);
+    setError(null);
+  }, [currentOrg?.id]);
 
 
   return (
@@ -52,20 +62,21 @@ function AuditLogsContent() {
           </p>
         </div>
         <input
-          placeholder="Filter by event (e.g. LOGIN_FAILED)"
+          placeholder="Filter by event"
           value={eventFilter}
           onChange={(e) => setEventFilter(e.target.value)}
-          className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm text-slate-200 placeholder:text-slate-500"
+          className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm text-slate-200 placeholder:text-slate-500 w-full sm:w-auto"
         />
       </div>
 
       {error ? (
         <ApiErrorBanner error={error} />
       ) : !logs ? (
-        <p className="text-sm text-slate-500">Loading...</p>
+        <SkeletonTable rows={5} cols={3} />
       ) : logs.length === 0 ? (
         <p className="text-sm text-slate-500">No matching events.</p>
       ) : (
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-slate-800 text-left text-xs uppercase tracking-wide text-slate-500">
@@ -84,6 +95,7 @@ function AuditLogsContent() {
             ))}
           </tbody>
         </table>
+        </div>
       )}
     </div>
   );

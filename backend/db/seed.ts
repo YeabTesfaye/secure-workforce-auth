@@ -144,6 +144,7 @@ async function seedOrganization(spec: OrgSpec) {
 
 async function main() {
   await seedPermissionCatalog();
+  console.log("Permission catalog seeded.");
 
   // Acme Corporation -- the primary demo scenario from the project brief
   // (Carol logs in, tries to change org settings -> 403; Bob updates a

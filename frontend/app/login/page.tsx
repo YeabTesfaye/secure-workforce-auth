@@ -21,9 +21,24 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  function validateForm(): string | null {
+    if (!email) return "Email is required.";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return "Please enter a valid email address.";
+    if (!password) return "Password is required.";
+    if (password.length < 1) return "Password is required.";
+    return null;
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+
+    const validationError = validateForm();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
     setSubmitting(true);
     try {
       await api("/auth/login", { method: "POST", body: { email, password } });
@@ -46,23 +61,27 @@ export default function LoginPage() {
         <h1 className="mb-1 font-mono text-lg font-semibold text-emerald-400">SecureWorkforce</h1>
         <p className="mb-6 text-sm text-slate-500">Sign in with a seeded demo account, or your own.</p>
 
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <input
-            type="email"
-            required
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
-          />
-          <input
-            type="password"
-            required
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
-          />
+        <form onSubmit={handleSubmit} className="space-y-3" noValidate>
+          <div>
+            <input
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
+              className="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
+            />
+          </div>
+          <div>
+            <input
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+              className="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
+            />
+          </div>
           {error && <p className="text-sm text-red-400">{error}</p>}
           <button
             type="submit"

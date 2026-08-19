@@ -1,6 +1,6 @@
 import { db } from "../../infrastructure/database/client.js";
 import { projects, organizationMembers } from "../../../db/schema/index.js";
-import { and, eq } from "drizzle-orm";
+import { and, eq, count } from "drizzle-orm";
 import { NotFoundError, ValidationError } from "../../shared/errors/app-error.js";
 
 // managerId must belong to a real member of THIS organization -- otherwise
@@ -19,8 +19,20 @@ async function assertIsOrgMember(organizationId: string, userId: string) {
   }
 }
 
-export async function listProjects(organizationId: string) {
-  return db.select().from(projects).where(eq(projects.organizationId, organizationId));
+export async function listProjects(organizationId: string, limit: number, offset: number) {
+  const [totalRow] = await db
+    .select({ total: count() })
+    .from(projects)
+    .where(eq(projects.organizationId, organizationId));
+
+  const data = await db
+    .select()
+    .from(projects)
+    .where(eq(projects.organizationId, organizationId))
+    .limit(limit)
+    .offset(offset);
+
+  return { data, total: totalRow?.total ?? 0 };
 }
 
 export async function createProject(organizationId: string, name: string, managerId?: string) {

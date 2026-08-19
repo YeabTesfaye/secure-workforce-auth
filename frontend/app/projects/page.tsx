@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { RequireAuth } from "@/components/RequireAuth";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
+import { SkeletonList } from "@/components/Skeleton";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError, type Project } from "@/lib/api";
 
@@ -14,39 +15,44 @@ function ProjectsContent() {
   const [editName, setEditName] = useState("");
   const [rowError, setRowError] = useState<Record<string, string>>({});
 
-  // 1. Wrapped in useCallback to prevent endless re-renders
   const load = useCallback(() => {
     if (!currentOrg) return;
 
-    // A flag to prevent setting state if the user leaves the page early
     let isMounted = true;
 
     api<{ data: Project[] }>(`/organizations/${currentOrg.id}/projects`)
       .then((res) => {
         if (isMounted) {
           setProjects(res.data);
-          setError(null); // Clear errors safely here
+          setError(null);
         }
       })
       .catch((err) => {
         if (isMounted) {
           setError(err);
-          setProjects(null); // Clear projects if the fetch fails
+          setProjects(null);
         }
       });
 
     return () => {
       isMounted = false;
     };
-  }, [currentOrg]);
+  }, [currentOrg?.id]);
 
-  // 2. Updated useEffect to safely run the stable load function
   useEffect(() => {
     const cleanup = load();
     return () => {
       if (cleanup) cleanup();
     };
   }, [load]);
+
+  // Reset state when org changes
+  useEffect(() => {
+    setProjects(null);
+    setError(null);
+    setEditingId(null);
+    setRowError({});
+  }, [currentOrg?.id]);
 
   async function saveEdit(projectId: string) {
     if (!currentOrg) return;
@@ -57,7 +63,7 @@ function ProjectsContent() {
         body: { name: editName },
       });
       setEditingId(null);
-      load(); // Safely triggers a refresh
+      load();
     } catch (err) {
       // This is the resource-level authorization demo: RBAC alone
       // (projects:update) is not sufficient here -- the API additionally
@@ -85,7 +91,7 @@ function ProjectsContent() {
       {error ? (
         <ApiErrorBanner error={error} />
       ) : !projects ? (
-        <p className="text-sm text-slate-500">Loading...</p>
+        <SkeletonList rows={4} />
       ) : projects.length === 0 ? (
         <p className="text-sm text-slate-500">No projects yet.</p>
       ) : (
@@ -93,24 +99,26 @@ function ProjectsContent() {
           {projects.map((p) => (
             <li key={p.id} className="rounded border border-slate-800 bg-slate-900/40 p-3">
               {editingId === p.id ? (
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
                   <input
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
-                    className="flex-1 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-sm text-slate-100"
+                    className="flex-1 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-sm text-slate-100 w-full sm:w-auto"
                   />
-                  <button
-                    onClick={() => void saveEdit(p.id)}
-                    className="rounded bg-emerald-600 px-3 py-1 text-xs font-medium text-white hover:bg-emerald-500"
-                  >
-                    Save
-                  </button>
-                  <button
-                    onClick={() => setEditingId(null)}
-                    className="rounded border border-slate-700 px-3 py-1 text-xs text-slate-300"
-                  >
-                    Cancel
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => void saveEdit(p.id)}
+                      className="rounded bg-emerald-600 px-3 py-1 text-xs font-medium text-white hover:bg-emerald-500"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={() => setEditingId(null)}
+                      className="rounded border border-slate-700 px-3 py-1 text-xs text-slate-300"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="flex items-center justify-between">

@@ -6,6 +6,7 @@ import { requireProjectAccess } from "../../middleware/resource-authorization.js
 import { csrfProtection } from "../../middleware/csrf.js";
 import { PERMISSIONS } from "../../shared/utils/permissions-catalog.js";
 import { asyncHandler } from "../../shared/utils/async-handler.js";
+import { paginationSchema, buildPaginationMeta } from "../../shared/utils/pagination.js";
 
 export const projectsRouter = Router({ mergeParams: true });
 
@@ -23,8 +24,9 @@ projectsRouter.get(
   "/",
   requirePermission(PERMISSIONS.PROJECTS_READ),
   asyncHandler(async (req, res) => {
-    const list = await service.listProjects(req.orgContext!.organizationId);
-    res.json({ data: list });
+    const { limit, offset } = paginationSchema.parse(req.query);
+    const { data, total } = await service.listProjects(req.orgContext!.organizationId, limit, offset);
+    res.json({ data, pagination: buildPaginationMeta(total, limit, offset) });
   })
 );
 

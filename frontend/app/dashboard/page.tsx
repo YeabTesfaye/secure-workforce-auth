@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { RequireAuth } from "@/components/RequireAuth";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
+import { SkeletonGrid, SkeletonList } from "@/components/Skeleton";
 import { useAuth } from "@/lib/auth-context";
 import { api, type Project, type AuditLogEntry } from "@/lib/api";
 
@@ -13,10 +14,9 @@ function DashboardContent() {
   const [recentEvents, setRecentEvents] = useState<AuditLogEntry[] | null>(null);
   const [eventsError, setEventsError] = useState<unknown>(null);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     if (!currentOrg) return;
 
-    // Use a flag to avoid setting state if the component unmounts mid-flight
     let isMounted = true;
 
     // Fetch projects
@@ -24,13 +24,13 @@ function DashboardContent() {
       .then((res) => {
         if (isMounted) {
           setProjects(res.data);
-          setProjectsError(null); // Safely clear old errors here
+          setProjectsError(null);
         }
       })
       .catch((err) => {
         if (isMounted) {
           setProjectsError(err);
-          setProjects(null); // Clear state if the API fails
+          setProjects(null);
         }
       });
 
@@ -41,20 +41,35 @@ function DashboardContent() {
       .then((res) => {
         if (isMounted) {
           setRecentEvents(res.data);
-          setEventsError(null); // Safely clear old errors here
+          setEventsError(null);
         }
       })
       .catch((err) => {
         if (isMounted) {
           setEventsError(err);
-          setRecentEvents(null); // Clear state if the API fails
+          setRecentEvents(null);
         }
       });
 
     return () => {
       isMounted = false;
     };
-  }, [currentOrg]);
+  }, [currentOrg?.id]);
+
+  useEffect(() => {
+    const cleanup = load();
+    return () => {
+      if (cleanup) cleanup();
+    };
+  }, [load]);
+
+  // Reset state when org changes
+  useEffect(() => {
+    setProjects(null);
+    setProjectsError(null);
+    setRecentEvents(null);
+    setEventsError(null);
+  }, [currentOrg?.id]);
 
   return (
     <div className="space-y-8">
@@ -65,7 +80,7 @@ function DashboardContent() {
         </p>
       </div>
 
-      <div className="grid gap-6 sm:grid-cols-3">
+      <div className="grid gap-6 grid-cols-1 sm:grid-cols-3">
         <div className="rounded border border-slate-800 bg-slate-900/40 p-4">
           <p className="text-xs uppercase tracking-wide text-slate-500">Current user</p>
           <p className="mt-1 text-sm text-slate-200">{user?.email}</p>
@@ -85,7 +100,7 @@ function DashboardContent() {
         {projectsError ? (
           <ApiErrorBanner error={projectsError} />
         ) : !projects ? (
-          <p className="text-sm text-slate-500">Loading...</p>
+          <SkeletonGrid cols={3} />
         ) : projects.length === 0 ? (
           <p className="text-sm text-slate-500">No projects yet.</p>
         ) : (
@@ -104,15 +119,15 @@ function DashboardContent() {
         {eventsError ? (
           <ApiErrorBanner error={eventsError} />
         ) : !recentEvents ? (
-          <p className="text-sm text-slate-500">Loading...</p>
+          <SkeletonList rows={3} />
         ) : recentEvents.length === 0 ? (
           <p className="text-sm text-slate-500">No recent events.</p>
         ) : (
           <ul className="divide-y divide-slate-800 rounded border border-slate-800">
             {recentEvents.map((e) => (
-              <li key={e.id} className="flex justify-between px-4 py-2 text-sm">
+              <li key={e.id} className="flex flex-col sm:flex-row sm:justify-between px-4 py-2 text-sm gap-1">
                 <span className="font-mono text-slate-300">{e.event}</span>
-                <span className="text-slate-500">{new Date(e.createdAt).toLocaleString()}</span>
+                <span className="text-slate-500 text-xs sm:text-sm">{new Date(e.createdAt).toLocaleString()}</span>
               </li>
             ))}
           </ul>

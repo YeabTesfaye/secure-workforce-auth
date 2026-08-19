@@ -6,6 +6,7 @@ import { csrfProtection } from "../../middleware/csrf.js";
 import { recordSecurityEvent } from "../audit/audit.service.js";
 import { asyncHandler } from "../../shared/utils/async-handler.js";
 import { UnauthorizedError } from "../../shared/errors/app-error.js";
+import { paginationSchema, buildPaginationMeta } from "../../shared/utils/pagination.js";
 
 export const sessionsRouter = Router();
 sessionsRouter.use(authenticateAccessToken);
@@ -13,9 +14,10 @@ sessionsRouter.use(authenticateAccessToken);
 sessionsRouter.get(
   "/",
   asyncHandler(async (req, res) => {
-    const sessions = await listSessions(req.auth!.userId);
+    const { limit, offset } = paginationSchema.parse(req.query);
+    const { data, total } = await listSessions(req.auth!.userId, limit, offset);
     res.json({
-      data: sessions.map((s) => ({
+      data: data.map((s) => ({
         id: s.id,
         deviceLabel: s.deviceLabel,
         ipAddress: s.ipAddress,
@@ -23,6 +25,7 @@ sessionsRouter.get(
         createdAt: s.createdAt,
         isCurrent: s.id === req.auth!.sessionId,
       })),
+      pagination: buildPaginationMeta(total, limit, offset),
     });
   })
 );

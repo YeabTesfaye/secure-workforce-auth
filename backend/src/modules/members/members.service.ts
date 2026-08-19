@@ -1,12 +1,17 @@
 import { db } from "../../infrastructure/database/client.js";
 import { organizationMembers, users, roles } from "../../../db/schema/index.js";
-import { and, eq } from "drizzle-orm";
+import { and, eq, count } from "drizzle-orm";
 import { NotFoundError, ConflictError, ValidationError } from "../../shared/errors/app-error.js";
 import { recordSecurityEvent } from "../audit/audit.service.js";
 import { revokeAllSessions } from "../sessions/sessions.service.js";
 
-export async function listMembers(organizationId: string) {
-  return db
+export async function listMembers(organizationId: string, limit: number, offset: number) {
+  const [totalRow] = await db
+    .select({ total: count() })
+    .from(organizationMembers)
+    .where(eq(organizationMembers.organizationId, organizationId));
+
+  const data = await db
     .select({
       membershipId: organizationMembers.id,
       userId: users.id,
@@ -19,7 +24,11 @@ export async function listMembers(organizationId: string) {
     .from(organizationMembers)
     .innerJoin(users, eq(organizationMembers.userId, users.id))
     .innerJoin(roles, eq(organizationMembers.roleId, roles.id))
-    .where(eq(organizationMembers.organizationId, organizationId));
+    .where(eq(organizationMembers.organizationId, organizationId))
+    .limit(limit)
+    .offset(offset);
+
+  return { data, total: totalRow?.total ?? 0 };
 }
 
 // Adds an existing user to the org by email. (Full invite-by-email-with-token
