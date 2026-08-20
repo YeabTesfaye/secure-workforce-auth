@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { useToast } from "@/lib/toast-context";
 import {
   Shield,
   Mail,
@@ -28,6 +29,7 @@ const PASSWORD_RULES = [
 export default function RegisterPage() {
   const router = useRouter();
   const { user, loading, refresh } = useAuth();
+  const { toast } = useToast();
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
   const [password, setPassword] = useState("");
@@ -68,6 +70,7 @@ export default function RegisterPage() {
         body: { email, password, fullName: fullName || undefined },
       });
       setSuccess(true);
+      toast("success", "Account created! Signing you in...");
       // Auto-login after registration
       try {
         await api("/auth/login", { method: "POST", body: { email, password } });
@@ -79,9 +82,12 @@ export default function RegisterPage() {
       }
     } catch (err) {
       if (err instanceof ApiError) {
-        setError(err.status === 409 ? "An account with this email already exists." : err.message);
+        const msg = err.status === 409 ? "An account with this email already exists." : err.message;
+        setError(msg);
+        toast("error", msg);
       } else {
         setError("Could not reach the API.");
+        toast("error", "Could not reach the API.");
       }
     } finally {
       setSubmitting(false);

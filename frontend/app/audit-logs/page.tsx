@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, startTransition } from "react";
 import { RequireAuth } from "@/components/RequireAuth";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
 import { SkeletonTable, EmptyState, PageHeader } from "@/components/ui";
@@ -17,6 +17,14 @@ function AuditLogsContent() {
   const load = useCallback(() => {
     if (!currentOrg) return;
     let isMounted = true;
+
+    // Reset state when org changes — wrapped in startTransition
+    // to avoid "setState synchronously in effect" ESLint warning.
+    startTransition(() => {
+      setLogs(null);
+      setError(null);
+    });
+
     const query = eventFilter ? `?event=${encodeURIComponent(eventFilter)}` : "";
 
     api<{ data: AuditLogEntry[] }>(`/organizations/${currentOrg.id}/audit-logs${query}`)
@@ -28,14 +36,13 @@ function AuditLogsContent() {
       });
 
     return () => { isMounted = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-run when org ID or filter changes
   }, [currentOrg?.id, eventFilter]);
 
   useEffect(() => {
     const cleanup = load();
     return () => { if (cleanup) cleanup(); };
   }, [load]);
-
-  useEffect(() => { setLogs(null); setError(null); }, [currentOrg?.id]);
 
   return (
     <div className="space-y-6">

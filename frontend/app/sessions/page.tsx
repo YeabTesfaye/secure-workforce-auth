@@ -5,6 +5,7 @@ import { RequireAuth } from "@/components/RequireAuth";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
 import { SkeletonList, EmptyState, PageHeader, Button } from "@/components/ui";
 import { api, type Session } from "@/lib/api";
+import { useToast } from "@/lib/toast-context";
 import {
   Monitor,
   Globe,
@@ -16,6 +17,7 @@ import {
 } from "lucide-react";
 
 function SessionsContent() {
+  const { toast } = useToast();
   const [sessions, setSessions] = useState<Session[] | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -41,6 +43,7 @@ function SessionsContent() {
     setBusyId(id);
     try {
       await api(`/sessions/${id}`, { method: "DELETE" });
+      toast("success", "Session revoked.");
       load();
     } finally {
       setBusyId(null);
@@ -51,6 +54,7 @@ function SessionsContent() {
     setBusyId("all");
     try {
       await api("/sessions/all", { method: "DELETE" });
+      toast("success", "All other sessions revoked.");
       load();
     } finally {
       setBusyId(null);

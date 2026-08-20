@@ -8,7 +8,6 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import {
   Shield,
   Lock,
-  Users,
   KeyRound,
   ArrowRight,
   CheckCircle2,

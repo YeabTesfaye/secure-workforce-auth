@@ -1,15 +1,17 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, startTransition } from "react";
 import { RequireAuth } from "@/components/RequireAuth";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
-import { SkeletonGrid, EmptyState, PageHeader, Button, Input } from "@/components/ui";
+import { SkeletonGrid, EmptyState, PageHeader, Button } from "@/components/ui";
 import { useAuth } from "@/lib/auth-context";
+import { useToast } from "@/lib/toast-context";
 import { api, ApiError, type Project } from "@/lib/api";
-import { FolderKanban, Pencil, Save, X, CheckCircle2 } from "lucide-react";
+import { FolderKanban, Pencil, Save, X, CheckCircle2, Plus } from "lucide-react";
 
 function ProjectsContent() {
   const { currentOrg, user } = useAuth();
+  const { toast } = useToast();
   const [projects, setProjects] = useState<Project[] | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -17,9 +19,27 @@ function ProjectsContent() {
   const [rowError, setRowError] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
+  // Create project state
+  const [showCreate, setShowCreate] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [nameError, setNameError] = useState<string | null>(null);
+
   const load = useCallback(() => {
     if (!currentOrg) return;
     let isMounted = true;
+
+    // Reset UI state when org changes — wrapped in startTransition
+    // to avoid "setState synchronously in effect" ESLint warning.
+    startTransition(() => {
+      setProjects(null);
+      setError(null);
+      setEditingId(null);
+      setRowError({});
+      setShowCreate(false);
+      setNewName("");
+    });
 
     api<{ data: Project[] }>(`/organizations/${currentOrg.id}/projects`)
       .then((res) => {
@@ -30,6 +50,7 @@ function ProjectsContent() {
       });
 
     return () => { isMounted = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-run when org ID changes
   }, [currentOrg?.id]);
 
   useEffect(() => {
@@ -37,12 +58,34 @@ function ProjectsContent() {
     return () => { if (cleanup) cleanup(); };
   }, [load]);
 
-  useEffect(() => {
-    setProjects(null);
-    setError(null);
-    setEditingId(null);
-    setRowError({});
-  }, [currentOrg?.id]);
+  async function createProject() {
+    if (!currentOrg || !newName.trim()) return;
+    // Client-side validation
+    const name = newName.trim();
+    if (name.length > 255) {
+      setNameError("Project name must be 255 characters or less");
+      return;
+    }
+    setCreating(true);
+    setCreateError(null);
+    setNameError(null);
+    try {
+      await api(`/organizations/${currentOrg.id}/projects`, {
+        method: "POST",
+        body: { name: newName.trim() },
+      });
+      setNewName("");
+      setShowCreate(false);
+      toast("success", "Project created successfully.");
+      load();
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : "Failed to create project.";
+      setCreateError(message);
+      toast("error", message);
+    } finally {
+      setCreating(false);
+    }
+  }
 
   async function saveEdit(projectId: string) {
     if (!currentOrg) return;
@@ -54,6 +97,7 @@ function ProjectsContent() {
         body: { name: editName },
       });
       setEditingId(null);
+      toast("success", "Project updated successfully.");
       load();
     } catch (err) {
       const message =
@@ -61,6 +105,7 @@ function ProjectsContent() {
           ? "You are not the assigned manager of this project."
           : "Update failed.";
       setRowError((prev) => ({ ...prev, [projectId]: message }));
+      toast("error", message);
     } finally {
       setSaving(false);
     }
@@ -72,7 +117,43 @@ function ProjectsContent() {
         icon={FolderKanban}
         title="Projects"
         description={`${currentOrg?.name ?? "No organization selected"} · editing requires projects:update AND being the assigned manager or org OWNER`}
+        action={
+          <Button size="sm" onClick={() => setShowCreate(!showCreate)}>
+            <Plus className="h-3.5 w-3.5" />
+            New project
+          </Button>
+        }
       />
+
+      {/* Create form */}
+      {showCreate && (
+        <div className="rounded-xl border border-[var(--brand-500)]/30 bg-[var(--surface-card)] p-4 animate-fade-in">
+          <p className="text-sm font-medium text-[var(--text-primary)] mb-3">Create a new project</p>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <input
+              value={newName}
+              onChange={(e) => { setNewName(e.target.value); setNameError(null); }}
+              placeholder="Project name"
+              className={`flex-1 rounded-lg border bg-[var(--surface-input)] px-3.5 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-500)] ${
+                nameError ? "border-red-500 dark:border-red-400" : "border-[var(--border-default)]"
+              }`}
+              autoFocus
+              onKeyDown={(e) => { if (e.key === "Enter" && newName.trim()) void createProject(); }}
+            />
+            <div className="flex gap-2">
+              <Button size="sm" onClick={() => void createProject()} loading={creating} disabled={!newName.trim()}>
+                Create
+              </Button>
+              <Button size="sm" variant="secondary" onClick={() => { setShowCreate(false); setNewName(""); setCreateError(null); }}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+          {(createError || nameError) && (
+            <p className="mt-2 text-xs text-red-500 dark:border-red-400">{createError || nameError}</p>
+          )}
+        </div>
+      )}
 
       {error ? (
         <ApiErrorBanner error={error} />
@@ -83,6 +164,12 @@ function ProjectsContent() {
           icon={FolderKanban}
           title="No projects yet"
           description="Create your first project to get started."
+          action={
+            <Button size="sm" onClick={() => setShowCreate(true)}>
+              <Plus className="h-3.5 w-3.5" />
+              Create project
+            </Button>
+          }
         />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 animate-slide-up stagger-1">
@@ -105,6 +192,7 @@ function ProjectsContent() {
                       onChange={(e) => setEditName(e.target.value)}
                       className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-input)] px-3 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-500)]"
                       autoFocus
+                      onKeyDown={(e) => { if (e.key === "Enter" && editName.trim()) void saveEdit(p.id); }}
                     />
                     <div className="flex gap-2">
                       <Button size="sm" onClick={() => void saveEdit(p.id)} loading={saving}>
@@ -142,7 +230,7 @@ function ProjectsContent() {
                         </span>
                       ) : (
                         <span className="inline-flex items-center rounded-full bg-[var(--surface-input)] border border-[var(--border-default)] px-2.5 py-0.5 text-xs text-[var(--text-muted)]">
-                          Not your project
+                          Not assigned to you
                         </span>
                       )}
                     </div>

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { useToast } from "@/lib/toast-context";
 import {
   Shield,
   Mail,
@@ -28,6 +29,7 @@ const DEMO_ACCOUNTS = [
 export default function LoginPage() {
   const router = useRouter();
   const { user, loading, refresh } = useAuth();
+  const { toast } = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -55,6 +57,7 @@ export default function LoginPage() {
     try {
       await api("/auth/login", { method: "POST", body: { email, password } });
       await refresh();
+      toast("success", "Welcome back! You are now signed in.");
       router.push("/dashboard");
     } catch (err) {
       if (err instanceof ApiError) {
@@ -73,8 +76,8 @@ export default function LoginPage() {
 
   if (loading || user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--background)]">
-        <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-[var(--brand-500)] border-t-transparent" />
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-(--brand-500) border-t-transparent" />
       </div>
     );
   }
@@ -86,10 +89,10 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-[var(--background)]">
+    <div className="flex min-h-screen bg-background">
       {/* ── Left branding panel ───────────────────────────── */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-[var(--brand-600)] to-emerald-700" />
+        <div className="absolute inset-0  bg-linear-to-br  from-(--brand) to-emerald-700" />
         <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PHBhdGggZD0iTTM2IDM0djZoNnYtNmgtNnptMC0zMHY2aDZ2LTZoLTZ6Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-30" />
         <div className="relative z-10 flex flex-col justify-center px-12 xl:px-16">
           <div className="mb-8 flex items-center gap-3">
@@ -122,17 +125,17 @@ export default function LoginPage() {
         <div className="w-full max-w-sm">
           {/* Mobile logo */}
           <div className="mb-8 flex items-center gap-2.5 lg:hidden">
-            <div className="rounded-lg bg-[var(--brand-600)] p-1.5">
+            <div className="rounded-lg  bg-(--brand) p-1.5">
               <Shield className="h-5 w-5 text-white" />
             </div>
-            <span className="font-mono text-sm font-bold text-[var(--text-primary)]">SecureWorkforce</span>
+            <span className="font-mono text-sm font-bold text-(--text-primary)]">SecureWorkforce</span>
           </div>
 
           <div className="animate-fade-in">
-            <h1 className="text-2xl font-bold text-[var(--text-primary)]">Sign in</h1>
-            <p className="mt-2 text-sm text-[var(--text-muted)]">
+            <h1 className="text-2xl font-bold  text-(--text-primary)">Sign in</h1>
+            <p className="mt-2 text-sm  text-(--text-muted)]">
               Don&apos;t have an account?{" "}
-              <Link href="/register" className="font-medium text-[var(--brand-600)] dark:text-[var(--brand-400)] hover:underline">
+              <Link href="/register" className="font-medium  hover:underline text-(--brand-600)] dark:text-(--brand-400)]">
                 Create one
               </Link>
             </p>
@@ -140,36 +143,36 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="mt-8 space-y-4 animate-slide-up stagger-1" noValidate>
             <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-[var(--text-secondary)]">Email</label>
+              <label className="block text-sm font-medium text-(--text-secondary)]">Email</label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
+                <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-(--text-muted)]" />
                 <input
                   type="email"
                   placeholder="you@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   autoComplete="email"
-                  className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-input)] pl-10 pr-3.5 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--brand-500)] focus:border-transparent hover:border-[var(--border-strong)]"
+                  className="w-full rounded-lg border border-(--border-default) bg-(--surface-input) pl-10 pr-3.5 py-2.5 text-sm text-(--text-primary) placeholder:text-(--text-muted) transition-colors focus:outline-none focus:ring-2 focus:ring-(--brand-500) focus:border-transparent hover:border-(--border-strong)"
                 />
               </div>
             </div>
 
             <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-[var(--text-secondary)]">Password</label>
+              <label className="block text-sm font-medium text-(--text-secondary)]">Password</label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
+                <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-(--text-muted)]" />
                 <input
                   type={showPassword ? "text" : "password"}
                   placeholder="••••••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   autoComplete="current-password"
-                  className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-input)] pl-10 pr-10 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--brand-500)] focus:border-transparent hover:border-[var(--border-strong)]"
+                  className="w-full rounded-lg border border-(--border-default) bg-(--surface-input) pl-10 pr-10 py-2.5 text-sm text-(--text-primary) placeholder:text-(--text-muted) transition-colors focus:outline-none focus:ring-2 focus:ring-(--brand-500) focus:border-transparent hover:border-(--border-strong)"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-(--text-muted)] hover:text-(--text-secondary)] transition-colors"
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
@@ -182,10 +185,16 @@ export default function LoginPage() {
               </div>
             )}
 
+            <div className="flex justify-end">
+              <Link href="/forgot-password" className="text-xs font-medium text-(--brand-600)] dark:text-(--brand-400)] hover:underline">
+                Forgot password?
+              </Link>
+            </div>
+
             <button
               type="submit"
               disabled={submitting}
-              className="w-full flex items-center justify-center gap-2 rounded-lg bg-[var(--brand-600)] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[var(--brand-600)]/25 hover:bg-[var(--brand-500)] hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98]"
+              className="w-full flex items-center justify-center gap-2 rounded-lg bg-(--brand-600) px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-(--brand-600)/25 hover:bg-(--brand-500) hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98]"
             >
               {submitting ? (
                 <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
@@ -199,12 +208,12 @@ export default function LoginPage() {
           </form>
 
           {/* Demo accounts */}
-          <div className="mt-8 border-t border-[var(--border-default)] pt-6 animate-slide-up stagger-2">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+          <div className="mt-8 border-t border-(--border-default) pt-6 animate-slide-up stagger-2">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-(--text-muted)]">
               Demo accounts
             </p>
-            <p className="mb-3 text-xs text-[var(--text-muted)]">
-              Password: <code className="rounded bg-[var(--surface-input)] px-1.5 py-0.5 font-mono text-[var(--text-secondary)]">DemoPassword123!</code>
+            <p className="mb-3 text-xs text-(--text-muted)]">
+              Password: <code className="rounded bg-(--surface-input) px-1.5 py-0.5 font-mono text-(--text-secondary)]">DemoPassword123!</code>
             </p>
             <div className="space-y-2">
               {DEMO_ACCOUNTS.map((acc) => (
@@ -212,14 +221,14 @@ export default function LoginPage() {
                   key={acc.email}
                   type="button"
                   onClick={() => quickFill(acc.email)}
-                  className={`group w-full flex items-center gap-3 rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] px-3 py-2.5 text-left transition-all duration-200 hover:border-[var(--brand-500)]/30 hover:bg-[var(--surface-card-hover)] hover:shadow-[var(--shadow-sm)] ${email === acc.email ? "border-[var(--brand-500)]/30 bg-[var(--brand-500)]/5" : ""}`}
+                  className={`group w-full flex items-center gap-3 rounded-lg border border-(--border-default) bg-(--surface-card) px-3 py-2.5 text-left transition-all duration-200 hover:border-(--brand-500)/30 hover:bg-(--surface-card-hover) hover:shadow-(--shadow-sm) ${email === acc.email ? "border-(--brand-500)/30 bg-(--brand-500)/5" : ""}`}
                 >
-                  <div className={`rounded-md p-1.5 bg-[var(--surface-input)] ${acc.color} group-hover:bg-[var(--brand-500)]/10 transition-colors`}>
+                  <div className={`rounded-md p-1.5 bg-(--surface-input) ${acc.color} group-hover:bg-(--brand-500)/10 transition-colors`}>
                     <acc.icon className="h-3.5 w-3.5" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium text-[var(--text-primary)] truncate">{acc.email}</p>
-                    <p className="text-[11px] text-[var(--text-muted)] truncate">{acc.note}</p>
+                    <p className="text-xs font-medium text-(--text-primary)] truncate">{acc.email}</p>
+                    <p className="text-[11px] text- (--text-muted)] truncate">{acc.note}</p>
                   </div>
                 </button>
               ))}

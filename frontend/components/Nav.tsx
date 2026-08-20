@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { useToast } from "@/lib/toast-context";
 import { ThemeToggle } from "./ThemeToggle";
 import { useState } from "react";
 import {
@@ -11,11 +12,13 @@ import {
   Users,
   FolderKanban,
   Monitor,
-  ScrollText,
+  FileText,
   LogOut,
   ChevronDown,
   Menu,
   X,
+  KeyRound,
+  User,
 } from "lucide-react";
 
 const LINKS = [
@@ -23,12 +26,13 @@ const LINKS = [
   { href: "/members", label: "Members", icon: Users },
   { href: "/projects", label: "Projects", icon: FolderKanban },
   { href: "/sessions", label: "Sessions", icon: Monitor },
-  { href: "/audit-logs", label: "Audit Logs", icon: ScrollText },
+  { href: "/audit-logs", label: "Audit Logs", icon: FileText },
 ];
 
 export function Nav() {
   const pathname = usePathname();
   const { user, organizations, currentOrg, setCurrentOrgId, logout } = useAuth();
+  const { toast } = useToast();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [orgDropdownOpen, setOrgDropdownOpen] = useState(false);
 
@@ -118,8 +122,22 @@ export function Nav() {
               </div>
               <span className="text-sm text-[var(--text-secondary)] hidden lg:inline">{user.email}</span>
             </div>
+            <Link
+              href="/profile"
+              className="rounded-lg p-1.5 text-[var(--text-muted)] hover:bg-[var(--surface-card)] hover:text-[var(--text-primary)] transition-all duration-200"
+              title="Profile"
+            >
+              <User className="h-4 w-4" />
+            </Link>
+            <Link
+              href="/change-password"
+              className="rounded-lg p-1.5 text-[var(--text-muted)] hover:bg-[var(--surface-card)] hover:text-[var(--text-primary)] transition-all duration-200"
+              title="Change password"
+            >
+              <KeyRound className="h-4 w-4" />
+            </Link>
             <button
-              onClick={() => void logout()}
+              onClick={() => { toast("info", "You have been signed out."); void logout(); }}
               className="rounded-lg p-1.5 text-[var(--text-muted)] hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-500 transition-all duration-200"
               aria-label="Log out"
             >
@@ -185,21 +203,30 @@ export function Nav() {
             )}
 
             <div className="flex items-center justify-between rounded-lg bg-[var(--surface-card)] px-3 py-2">
-              <div className="flex items-center gap-2">
+              <Link href="/profile" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
                 <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--brand-500)]/10 text-[10px] font-bold text-[var(--brand-600)] dark:text-[var(--brand-400)]">
                   {(user.fullName ?? user.email)?.[0]?.toUpperCase()}
                 </div>
                 <span className="text-sm text-[var(--text-secondary)]">{user.email}</span>
+              </Link>
+              <div className="flex items-center gap-1">
+                <Link href="/profile" onClick={() => setMobileMenuOpen(false)} className="rounded-lg p-1.5 text-[var(--text-muted)] hover:bg-[var(--surface-input)] hover:text-[var(--text-primary)] transition-colors" title="Profile">
+                  <User className="h-4 w-4" />
+                </Link>
+                <Link href="/change-password" onClick={() => setMobileMenuOpen(false)} className="rounded-lg p-1.5 text-[var(--text-muted)] hover:bg-[var(--surface-input)] hover:text-[var(--text-primary)] transition-colors" title="Change password">
+                  <KeyRound className="h-4 w-4" />
+                </Link>
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    toast("info", "You have been signed out.");
+                    void logout();
+                  }}
+                  className="rounded-lg p-1.5 text-[var(--text-muted)] hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-500 transition-colors"
+                >
+                  <LogOut className="h-4 w-4" />
+                </button>
               </div>
-              <button
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  void logout();
-                }}
-                className="rounded-lg p-1.5 text-[var(--text-muted)] hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-500 transition-colors"
-              >
-                <LogOut className="h-4 w-4" />
-              </button>
             </div>
           </div>
         </div>

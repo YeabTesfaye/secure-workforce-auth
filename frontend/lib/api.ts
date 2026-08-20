@@ -123,3 +123,10 @@ export interface AuditLogEntry {
   metadata: Record<string, unknown>;
   createdAt: string;
 }
+
+export interface Role {
+  id: string;
+  name: string;
+  isSystem: boolean;
+  organizationId: string;
+}

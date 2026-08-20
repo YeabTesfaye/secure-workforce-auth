@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, startTransition } from "react";
 import { RequireAuth } from "@/components/RequireAuth";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
 import { SkeletonGrid, SkeletonList, StatCard, EmptyState, SkeletonCard } from "@/components/ui";
@@ -28,6 +28,15 @@ function DashboardContent() {
     if (!currentOrg) return;
 
     let isMounted = true;
+
+    // Reset state when org changes — wrapped in startTransition
+    // to avoid "setState synchronously in effect" ESLint warning.
+    startTransition(() => {
+      setProjects(null);
+      setProjectsError(null);
+      setRecentEvents(null);
+      setEventsError(null);
+    });
 
     api<{ data: Project[] }>(`/organizations/${currentOrg.id}/projects`)
       .then((res) => {
@@ -58,19 +67,13 @@ function DashboardContent() {
       });
 
     return () => { isMounted = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-run when org ID changes
   }, [currentOrg?.id]);
 
   useEffect(() => {
     const cleanup = load();
     return () => { if (cleanup) cleanup(); };
   }, [load]);
-
-  useEffect(() => {
-    setProjects(null);
-    setProjectsError(null);
-    setRecentEvents(null);
-    setEventsError(null);
-  }, [currentOrg?.id]);
 
   return (
     <div className="space-y-8">
