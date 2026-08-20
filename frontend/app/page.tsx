@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import {
@@ -14,7 +16,6 @@ import {
   Fingerprint,
   Globe,
   Zap,
-  LayoutDashboard,
 } from "lucide-react";
 
 const FEATURES = [
@@ -58,7 +59,22 @@ const SECURITY_CHECKS = [
 ];
 
 export default function HomePage() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && user) {
+      router.replace("/dashboard");
+    }
+  }, [loading, user, router]);
+
+  if (loading || user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[var(--background)]">
+        <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-[var(--brand-500)] border-t-transparent" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[var(--background)]">
@@ -73,30 +89,18 @@ export default function HomePage() {
           </div>
           <div className="flex items-center gap-3">
             <ThemeToggle />
-            {user ? (
-              <Link
-                href="/dashboard"
-                className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand-600)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--brand-500)] transition-all duration-200 shadow-sm hover:shadow-md"
-              >
-                <LayoutDashboard className="h-4 w-4" />
-                Dashboard
-              </Link>
-            ) : (
-              <>
-                <Link
-                  href="/login"
-                  className="rounded-lg px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
-                >
-                  Sign in
-                </Link>
-                <Link
-                  href="/register"
-                  className="rounded-lg bg-[var(--brand-600)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--brand-500)] transition-all duration-200 shadow-sm hover:shadow-md"
-                >
-                  Get started
-                </Link>
-              </>
-            )}
+            <Link
+              href="/login"
+              className="rounded-lg px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+            >
+              Sign in
+            </Link>
+            <Link
+              href="/register"
+              className="rounded-lg bg-[var(--brand-600)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--brand-500)] transition-all duration-200 shadow-sm hover:shadow-md"
+            >
+              Get started
+            </Link>
           </div>
         </div>
       </nav>
@@ -128,31 +132,19 @@ export default function HomePage() {
           </p>
 
           <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center animate-slide-up stagger-3">
-            {user ? (
-              <Link
-                href="/dashboard"
-                className="inline-flex items-center gap-2 rounded-xl bg-[var(--brand-600)] px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-[var(--brand-600)]/25 hover:bg-[var(--brand-500)] hover:shadow-xl hover:shadow-[var(--brand-600)]/30 transition-all duration-200 active:scale-[0.98]"
-              >
-                Go to Dashboard
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-            ) : (
-              <>
-                <Link
-                  href="/register"
-                  className="inline-flex items-center gap-2 rounded-xl bg-[var(--brand-600)] px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-[var(--brand-600)]/25 hover:bg-[var(--brand-500)] hover:shadow-xl hover:shadow-[var(--brand-600)]/30 transition-all duration-200 active:scale-[0.98]"
-                >
-                  Create an account
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-                <Link
-                  href="/login"
-                  className="inline-flex items-center gap-2 rounded-xl border border-[var(--border-default)] bg-[var(--surface-card)] px-6 py-3 text-sm font-semibold text-[var(--text-primary)] hover:bg-[var(--surface-card-hover)] hover:border-[var(--border-strong)] transition-all duration-200"
-                >
-                  Sign in to demo
-                </Link>
-              </>
-            )}
+            <Link
+              href="/register"
+              className="inline-flex items-center gap-2 rounded-xl bg-[var(--brand-600)] px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-[var(--brand-600)]/25 hover:bg-[var(--brand-500)] hover:shadow-xl hover:shadow-[var(--brand-600)]/30 transition-all duration-200 active:scale-[0.98]"
+            >
+              Create an account
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+            <Link
+              href="/login"
+              className="inline-flex items-center gap-2 rounded-xl border border-[var(--border-default)] bg-[var(--surface-card)] px-6 py-3 text-sm font-semibold text-[var(--text-primary)] hover:bg-[var(--surface-card-hover)] hover:border-[var(--border-strong)] transition-all duration-200"
+            >
+              Sign in to demo
+            </Link>
           </div>
 
           <div className="mt-16 flex flex-wrap justify-center gap-x-8 gap-y-3 text-sm text-[var(--text-muted)] animate-fade-in stagger-5">
@@ -201,31 +193,19 @@ export default function HomePage() {
             Sign up or log in with a pre-seeded demo account to see RBAC, multi-tenant isolation, and resource-level authorization in action.
           </p>
           <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-            {user ? (
-              <Link
-                href="/dashboard"
-                className="inline-flex items-center gap-2 rounded-xl bg-[var(--brand-600)] px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-[var(--brand-600)]/25 hover:bg-[var(--brand-500)] transition-all duration-200"
-              >
-                Go to Dashboard
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-            ) : (
-              <>
-                <Link
-                  href="/register"
-                  className="inline-flex items-center gap-2 rounded-xl bg-[var(--brand-600)] px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-[var(--brand-600)]/25 hover:bg-[var(--brand-500)] transition-all duration-200"
-                >
-                  Create an account
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-                <Link
-                  href="/login"
-                  className="inline-flex items-center gap-2 rounded-xl border border-[var(--border-default)] bg-[var(--surface-card)] px-6 py-3 text-sm font-semibold text-[var(--text-primary)] hover:bg-[var(--surface-card-hover)] transition-all duration-200"
-                >
-                  Sign in to demo
-                </Link>
-              </>
-            )}
+            <Link
+              href="/register"
+              className="inline-flex items-center gap-2 rounded-xl bg-[var(--brand-600)] px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-[var(--brand-600)]/25 hover:bg-[var(--brand-500)] transition-all duration-200"
+            >
+              Create an account
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+            <Link
+              href="/login"
+              className="inline-flex items-center gap-2 rounded-xl border border-[var(--border-default)] bg-[var(--surface-card)] px-6 py-3 text-sm font-semibold text-[var(--text-primary)] hover:bg-[var(--surface-card-hover)] transition-all duration-200"
+            >
+              Sign in to demo
+            </Link>
           </div>
         </div>
       </section>
