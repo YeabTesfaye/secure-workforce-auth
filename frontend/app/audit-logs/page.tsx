@@ -3,9 +3,10 @@
 import { useEffect, useState, useCallback } from "react";
 import { RequireAuth } from "@/components/RequireAuth";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
-import { SkeletonTable } from "@/components/Skeleton";
+import { SkeletonTable, EmptyState, PageHeader } from "@/components/ui";
 import { useAuth } from "@/lib/auth-context";
 import { api, type AuditLogEntry } from "@/lib/api";
+import { ScrollText, Search, Clock, Globe, User as UserIcon } from "lucide-react";
 
 function AuditLogsContent() {
   const { currentOrg } = useAuth();
@@ -15,57 +16,44 @@ function AuditLogsContent() {
 
   const load = useCallback(() => {
     if (!currentOrg) return;
-
     let isMounted = true;
     const query = eventFilter ? `?event=${encodeURIComponent(eventFilter)}` : "";
 
     api<{ data: AuditLogEntry[] }>(`/organizations/${currentOrg.id}/audit-logs${query}`)
       .then((res) => {
-        if (isMounted) {
-          setLogs(res.data);
-          setError(null);
-        }
+        if (isMounted) { setLogs(res.data); setError(null); }
       })
       .catch((err) => {
-        if (isMounted) {
-          setError(err);
-          setLogs(null);
-        }
+        if (isMounted) { setError(err); setLogs(null); }
       });
 
-    return () => {
-      isMounted = false;
-    };
+    return () => { isMounted = false; };
   }, [currentOrg?.id, eventFilter]);
 
   useEffect(() => {
     const cleanup = load();
-    return () => {
-      if (cleanup) cleanup();
-    };
+    return () => { if (cleanup) cleanup(); };
   }, [load]);
 
-  // Reset state when org changes
-  useEffect(() => {
-    setLogs(null);
-    setError(null);
-  }, [currentOrg?.id]);
-
+  useEffect(() => { setLogs(null); setError(null); }, [currentOrg?.id]);
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-100">Audit Logs</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            {currentOrg?.name ?? "No organization selected"} — requires <code>audit_logs:read</code>
-          </p>
-        </div>
+    <div className="space-y-6">
+      <PageHeader
+        icon={ScrollText}
+        title="Audit Logs"
+        description={`${currentOrg?.name ?? "No organization selected"} · requires audit_logs:read`}
+      />
+
+      {/* Filter */}
+      <div className="relative max-w-sm animate-fade-in">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
         <input
-          placeholder="Filter by event"
+          type="text"
+          placeholder="Filter by event type..."
           value={eventFilter}
           onChange={(e) => setEventFilter(e.target.value)}
-          className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm text-slate-200 placeholder:text-slate-500 w-full sm:w-auto"
+          className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-input)] pl-10 pr-3.5 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--brand-500)] focus:border-transparent hover:border-[var(--border-strong)]"
         />
       </div>
 
@@ -74,28 +62,55 @@ function AuditLogsContent() {
       ) : !logs ? (
         <SkeletonTable rows={5} cols={3} />
       ) : logs.length === 0 ? (
-        <p className="text-sm text-slate-500">No matching events.</p>
+        <EmptyState
+          icon={ScrollText}
+          title={eventFilter ? "No matching events" : "No audit events"}
+          description={eventFilter ? `No events match "${eventFilter}"` : "Security events will appear here as they occur."}
+        />
       ) : (
-        <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-slate-800 text-left text-xs uppercase tracking-wide text-slate-500">
-              <th className="py-2">Event</th>
-              <th className="py-2">IP</th>
-              <th className="py-2">When</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-800">
-            {logs.map((log) => (
-              <tr key={log.id} className="text-slate-300">
-                <td className="py-2 font-mono text-xs">{log.event}</td>
-                <td className="py-2 text-slate-500">{log.ipAddress ?? "—"}</td>
-                <td className="py-2 text-slate-500">{new Date(log.createdAt).toLocaleString()}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        </div>
+        <>
+          <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-card)] overflow-hidden animate-slide-up stagger-1">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[var(--border-default)] bg-[var(--surface-card)]">
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">Event</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">IP Address</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">Time</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--border-default)]">
+                  {logs.map((log) => (
+                    <tr key={log.id} className="transition-colors hover:bg-[var(--surface-card-hover)]">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center rounded-md bg-[var(--surface-input)] border border-[var(--border-default)] px-2 py-0.5 font-mono text-xs font-medium text-[var(--text-primary)]">
+                            {log.event}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1.5 text-[var(--text-muted)]">
+                          <Globe className="h-3.5 w-3.5" />
+                          {log.ipAddress ?? "—"}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+                          <Clock className="h-3.5 w-3.5" />
+                          {new Date(log.createdAt).toLocaleString()}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <p className="text-xs text-[var(--text-muted)]">
+            Showing {logs.length} event{logs.length !== 1 ? "s" : ""}
+          </p>
+        </>
       )}
     </div>
   );

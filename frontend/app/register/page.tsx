@@ -9,35 +9,45 @@ import {
   Shield,
   Mail,
   Lock,
+  User,
   ArrowRight,
+  CheckCircle2,
+  XCircle,
   Eye,
   EyeOff,
-  User,
-  Briefcase,
-  Crown,
 } from "lucide-react";
 
-const DEMO_ACCOUNTS = [
-  { email: "alice@acme.com", note: "OWNER at Acme Corp, EMPLOYEE at Startup Inc", icon: Crown, color: "text-amber-500" },
-  { email: "bob@acme.com", note: "MANAGER at Acme Corporation", icon: Briefcase, color: "text-blue-500" },
-  { email: "carol@acme.com", note: "EMPLOYEE at Acme Corporation", icon: User, color: "text-slate-500" },
-  { email: "david@acme.com", note: "HR_ADMINISTRATOR at Acme Corporation", icon: User, color: "text-purple-500" },
-  { email: "erin@startupinc.com", note: "OWNER at Startup Inc", icon: Crown, color: "text-amber-500" },
+const PASSWORD_RULES = [
+  { test: (p: string) => p.length >= 12, label: "At least 12 characters" },
+  { test: (p: string) => /[a-z]/.test(p), label: "One lowercase letter" },
+  { test: (p: string) => /[A-Z]/.test(p), label: "One uppercase letter" },
+  { test: (p: string) => /[0-9]/.test(p), label: "One digit" },
+  { test: (p: string) => /[^a-zA-Z0-9]/.test(p), label: "One symbol (!@#$...)" },
 ];
 
-export default function LoginPage() {
+export default function RegisterPage() {
   const router = useRouter();
   const { refresh } = useAuth();
   const [email, setEmail] = useState("");
+  const [fullName, setFullName] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [success, setSuccess] = useState(false);
+
+  function getPasswordErrors(pw: string) {
+    return PASSWORD_RULES.filter((r) => !r.test(pw));
+  }
 
   function validateForm(): string | null {
     if (!email) return "Email is required.";
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return "Please enter a valid email address.";
-    if (!password) return "Password is required.";
+    if (password.length < 1) return "Password is required.";
+    const pwErrors = getPasswordErrors(password);
+    if (pwErrors.length > 0) return pwErrors[0].label + ".";
+    if (password !== confirmPassword) return "Passwords do not match.";
     return null;
   }
 
@@ -53,12 +63,23 @@ export default function LoginPage() {
 
     setSubmitting(true);
     try {
-      await api("/auth/login", { method: "POST", body: { email, password } });
-      await refresh();
-      router.push("/dashboard");
+      await api("/auth/register", {
+        method: "POST",
+        body: { email, password, fullName: fullName || undefined },
+      });
+      setSuccess(true);
+      // Auto-login after registration
+      try {
+        await api("/auth/login", { method: "POST", body: { email, password } });
+        await refresh();
+        router.push("/dashboard");
+      } catch {
+        // If auto-login fails, redirect to login
+        router.push("/login");
+      }
     } catch (err) {
       if (err instanceof ApiError) {
-        setError(err.status === 423 ? err.message : "Invalid email or password.");
+        setError(err.status === 409 ? "An account with this email already exists." : err.message);
       } else {
         setError("Could not reach the API.");
       }
@@ -67,10 +88,18 @@ export default function LoginPage() {
     }
   }
 
-  function quickFill(e: string) {
-    setEmail(e);
-    setPassword("DemoPassword123!");
-    setError(null);
+  if (success) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[var(--background)]">
+        <div className="text-center animate-fade-in-scale">
+          <div className="mx-auto mb-4 rounded-full bg-emerald-500/10 p-3 w-fit">
+            <CheckCircle2 className="h-8 w-8 text-emerald-500" />
+          </div>
+          <h2 className="text-xl font-bold text-[var(--text-primary)]">Account created!</h2>
+          <p className="mt-2 text-sm text-[var(--text-muted)]">Redirecting you to the dashboard...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -87,17 +116,17 @@ export default function LoginPage() {
             <span className="font-mono text-xl font-bold text-white">SecureWorkforce</span>
           </div>
           <h2 className="text-3xl font-bold text-white leading-tight">
-            Welcome back to<br />
-            secure access
+            Start building with<br />
+            production-grade auth
           </h2>
           <p className="mt-4 max-w-md text-base text-white/80 leading-relaxed">
-            Sign in to manage your organizations, projects, and team members with
-            enterprise-grade authorization.
+            Create an organization, invite team members, and explore role-based access control
+            with resource-level authorization.
           </p>
           <div className="mt-10 space-y-4">
-            {["Multi-tenant isolation", "Resource-level authorization", "Real-time audit logging"].map((item) => (
+            {["Multi-tenant RBAC", "Refresh token rotation", "67+ security tests"].map((item) => (
               <div key={item} className="flex items-center gap-3 text-sm text-white/90">
-                <div className="h-1.5 w-1.5 rounded-full bg-white/40" />
+                <CheckCircle2 className="h-4 w-4 text-white/60" />
                 {item}
               </div>
             ))}
@@ -117,16 +146,16 @@ export default function LoginPage() {
           </div>
 
           <div className="animate-fade-in">
-            <h1 className="text-2xl font-bold text-[var(--text-primary)]">Sign in</h1>
+            <h1 className="text-2xl font-bold text-[var(--text-primary)]">Create your account</h1>
             <p className="mt-2 text-sm text-[var(--text-muted)]">
-              Don&apos;t have an account?{" "}
-              <Link href="/register" className="font-medium text-[var(--brand-600)] dark:text-[var(--brand-400)] hover:underline">
-                Create one
+              Already have an account?{" "}
+              <Link href="/login" className="font-medium text-[var(--brand-600)] dark:text-[var(--brand-400)] hover:underline">
+                Sign in
               </Link>
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="mt-8 space-y-4 animate-slide-up stagger-1" noValidate>
+          <form onSubmit={handleSubmit} className="mt-8 space-y-5 animate-slide-up stagger-1" noValidate>
             <div className="space-y-1.5">
               <label className="block text-sm font-medium text-[var(--text-secondary)]">Email</label>
               <div className="relative">
@@ -143,6 +172,21 @@ export default function LoginPage() {
             </div>
 
             <div className="space-y-1.5">
+              <label className="block text-sm font-medium text-[var(--text-secondary)]">Full name <span className="text-[var(--text-muted)]">(optional)</span></label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
+                <input
+                  type="text"
+                  placeholder="Jane Doe"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  autoComplete="name"
+                  className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-input)] pl-10 pr-3.5 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--brand-500)] focus:border-transparent hover:border-[var(--border-strong)]"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
               <label className="block text-sm font-medium text-[var(--text-secondary)]">Password</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
@@ -151,7 +195,7 @@ export default function LoginPage() {
                   placeholder="••••••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  autoComplete="current-password"
+                  autoComplete="new-password"
                   className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-input)] pl-10 pr-10 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--brand-500)] focus:border-transparent hover:border-[var(--border-strong)]"
                 />
                 <button
@@ -162,6 +206,41 @@ export default function LoginPage() {
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
+              {/* Password rules checklist */}
+              {password.length > 0 && (
+                <div className="mt-2 space-y-1">
+                  {PASSWORD_RULES.map((rule) => (
+                    <div key={rule.label} className="flex items-center gap-2 text-xs">
+                      {rule.test(password) ? (
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                      ) : (
+                        <XCircle className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+                      )}
+                      <span className={rule.test(password) ? "text-emerald-600 dark:text-emerald-400" : "text-[var(--text-muted)]"}>
+                        {rule.label}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-sm font-medium text-[var(--text-secondary)]">Confirm password</label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
+                <input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••••••"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  autoComplete="new-password"
+                  className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-input)] pl-10 pr-3.5 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--brand-500)] focus:border-transparent hover:border-[var(--border-strong)]"
+                />
+              </div>
+              {confirmPassword && password !== confirmPassword && (
+                <p className="text-xs text-red-500 dark:text-red-400">Passwords do not match</p>
+              )}
             </div>
 
             {error && (
@@ -179,40 +258,12 @@ export default function LoginPage() {
                 <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
               ) : (
                 <>
-                  Sign in
+                  Create account
                   <ArrowRight className="h-4 w-4" />
                 </>
               )}
             </button>
           </form>
-
-          {/* Demo accounts */}
-          <div className="mt-8 border-t border-[var(--border-default)] pt-6 animate-slide-up stagger-2">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-              Demo accounts
-            </p>
-            <p className="mb-3 text-xs text-[var(--text-muted)]">
-              Password: <code className="rounded bg-[var(--surface-input)] px-1.5 py-0.5 font-mono text-[var(--text-secondary)]">DemoPassword123!</code>
-            </p>
-            <div className="space-y-2">
-              {DEMO_ACCOUNTS.map((acc) => (
-                <button
-                  key={acc.email}
-                  type="button"
-                  onClick={() => quickFill(acc.email)}
-                  className={`group w-full flex items-center gap-3 rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] px-3 py-2.5 text-left transition-all duration-200 hover:border-[var(--brand-500)]/30 hover:bg-[var(--surface-card-hover)] hover:shadow-[var(--shadow-sm)] ${email === acc.email ? "border-[var(--brand-500)]/30 bg-[var(--brand-500)]/5" : ""}`}
-                >
-                  <div className={`rounded-md p-1.5 bg-[var(--surface-input)] ${acc.color} group-hover:bg-[var(--brand-500)]/10 transition-colors`}>
-                    <acc.icon className="h-3.5 w-3.5" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium text-[var(--text-primary)] truncate">{acc.email}</p>
-                    <p className="text-[11px] text-[var(--text-muted)] truncate">{acc.note}</p>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
       </div>
     </div>

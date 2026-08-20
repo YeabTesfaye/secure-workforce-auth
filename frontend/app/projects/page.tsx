@@ -3,9 +3,10 @@
 import { useEffect, useState, useCallback } from "react";
 import { RequireAuth } from "@/components/RequireAuth";
 import { ApiErrorBanner } from "@/components/ApiErrorBanner";
-import { SkeletonList } from "@/components/Skeleton";
+import { SkeletonGrid, EmptyState, PageHeader, Button, Input } from "@/components/ui";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError, type Project } from "@/lib/api";
+import { FolderKanban, Pencil, Save, X, CheckCircle2 } from "lucide-react";
 
 function ProjectsContent() {
   const { currentOrg, user } = useAuth();
@@ -14,39 +15,28 @@ function ProjectsContent() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [rowError, setRowError] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
 
   const load = useCallback(() => {
     if (!currentOrg) return;
-
     let isMounted = true;
 
     api<{ data: Project[] }>(`/organizations/${currentOrg.id}/projects`)
       .then((res) => {
-        if (isMounted) {
-          setProjects(res.data);
-          setError(null);
-        }
+        if (isMounted) { setProjects(res.data); setError(null); }
       })
       .catch((err) => {
-        if (isMounted) {
-          setError(err);
-          setProjects(null);
-        }
+        if (isMounted) { setError(err); setProjects(null); }
       });
 
-    return () => {
-      isMounted = false;
-    };
+    return () => { isMounted = false; };
   }, [currentOrg?.id]);
 
   useEffect(() => {
     const cleanup = load();
-    return () => {
-      if (cleanup) cleanup();
-    };
+    return () => { if (cleanup) cleanup(); };
   }, [load]);
 
-  // Reset state when org changes
   useEffect(() => {
     setProjects(null);
     setError(null);
@@ -56,6 +46,7 @@ function ProjectsContent() {
 
   async function saveEdit(projectId: string) {
     if (!currentOrg) return;
+    setSaving(true);
     setRowError((prev) => ({ ...prev, [projectId]: "" }));
     try {
       await api(`/organizations/${currentOrg.id}/projects/${projectId}`, {
@@ -65,84 +56,108 @@ function ProjectsContent() {
       setEditingId(null);
       load();
     } catch (err) {
-      // This is the resource-level authorization demo: RBAC alone
-      // (projects:update) is not sufficient here -- the API additionally
-      // checks whether the caller is this project's assigned manager or
-      // org OWNER, and rejects with 403 if not, even for a MANAGER role
-      // that CAN update projects in general. See docs/security.md.
       const message =
         err instanceof ApiError && err.status === 403
-          ? "Forbidden: you are not the assigned manager of this project."
+          ? "You are not the assigned manager of this project."
           : "Update failed.";
       setRowError((prev) => ({ ...prev, [projectId]: message }));
+    } finally {
+      setSaving(false);
     }
   }
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold text-slate-100">Projects</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          {currentOrg?.name ?? "No organization selected"} — editing requires{" "}
-          <code>projects:update</code> AND being the assigned manager or org OWNER
-        </p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        icon={FolderKanban}
+        title="Projects"
+        description={`${currentOrg?.name ?? "No organization selected"} · editing requires projects:update AND being the assigned manager or org OWNER`}
+      />
 
       {error ? (
         <ApiErrorBanner error={error} />
       ) : !projects ? (
-        <SkeletonList rows={4} />
+        <SkeletonGrid cols={3} />
       ) : projects.length === 0 ? (
-        <p className="text-sm text-slate-500">No projects yet.</p>
+        <EmptyState
+          icon={FolderKanban}
+          title="No projects yet"
+          description="Create your first project to get started."
+        />
       ) : (
-        <ul className="space-y-2">
-          {projects.map((p) => (
-            <li key={p.id} className="rounded border border-slate-800 bg-slate-900/40 p-3">
-              {editingId === p.id ? (
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
-                  <input
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    className="flex-1 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-sm text-slate-100 w-full sm:w-auto"
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => void saveEdit(p.id)}
-                      className="rounded bg-emerald-600 px-3 py-1 text-xs font-medium text-white hover:bg-emerald-500"
-                    >
-                      Save
-                    </button>
-                    <button
-                      onClick={() => setEditingId(null)}
-                      className="rounded border border-slate-700 px-3 py-1 text-xs text-slate-300"
-                    >
-                      Cancel
-                    </button>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 animate-slide-up stagger-1">
+          {projects.map((p) => {
+            const isEditing = editingId === p.id;
+            const isManager = p.managerId === user?.id;
+            return (
+              <div
+                key={p.id}
+                className={`group rounded-xl border bg-[var(--surface-card)] p-5 transition-all duration-200 hover:shadow-[var(--shadow-md)] ${
+                  isEditing
+                    ? "border-[var(--brand-500)]/40 ring-1 ring-[var(--brand-500)]/20"
+                    : "border-[var(--border-default)] hover:border-[var(--border-strong)]"
+                }`}
+              >
+                {isEditing ? (
+                  <div className="space-y-3">
+                    <input
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-input)] px-3 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-500)]"
+                      autoFocus
+                    />
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={() => void saveEdit(p.id)} loading={saving}>
+                        <Save className="h-3.5 w-3.5" />
+                        Save
+                      </Button>
+                      <Button size="sm" variant="secondary" onClick={() => setEditingId(null)}>
+                        <X className="h-3.5 w-3.5" />
+                        Cancel
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-slate-200">{p.name}</p>
-                    <p className="text-xs text-slate-500">
-                      {p.managerId === user?.id ? "You are the assigned manager" : "Not assigned to you"}
-                    </p>
+                ) : (
+                  <>
+                    <div className="flex items-start justify-between">
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-semibold text-[var(--text-primary)]">{p.name}</h3>
+                        <p className="mt-1 text-xs text-[var(--text-muted)]">
+                          Created {new Date(p.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => { setEditingId(p.id); setEditName(p.name); }}
+                        className="rounded-lg p-1.5 text-[var(--text-muted)] hover:bg-[var(--surface-input)] hover:text-[var(--text-primary)] transition-colors opacity-0 group-hover:opacity-100"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                    </div>
+
+                    <div className="mt-4 flex items-center gap-2">
+                      {isManager ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/20 px-2.5 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                          <CheckCircle2 className="h-3 w-3" />
+                          You manage this
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center rounded-full bg-[var(--surface-input)] border border-[var(--border-default)] px-2.5 py-0.5 text-xs text-[var(--text-muted)]">
+                          Not your project
+                        </span>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {rowError[p.id] && (
+                  <div className="mt-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 text-xs text-amber-600 dark:text-amber-400 animate-fade-in">
+                    {rowError[p.id]}
                   </div>
-                  <button
-                    onClick={() => {
-                      setEditingId(p.id);
-                      setEditName(p.name);
-                    }}
-                    className="rounded border border-slate-700 px-3 py-1 text-xs text-slate-300 hover:bg-slate-800"
-                  >
-                    Edit
-                  </button>
-                </div>
-              )}
-              {rowError[p.id] && <p className="mt-2 text-xs text-amber-400">{rowError[p.id]}</p>}
-            </li>
-          ))}
-        </ul>
+                )}
+              </div>
+            );
+          })}
+        </div>
       )}
     </div>
   );

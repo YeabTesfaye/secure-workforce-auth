@@ -13,7 +13,7 @@
 
 ```bash
 # Clone the repo
-git clone <repo-url>
+git clone https://github.com/YeabTesfaye/secure-workforce-auth.git
 cd secure-workforce-auth
 
 # Start infrastructure
